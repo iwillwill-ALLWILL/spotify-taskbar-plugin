@@ -1,10 +1,14 @@
 # Spotify Taskbar Overlay
 
-A lightweight Windows 11 Spotify taskbar-height mini-player written in Python + Win32/GDI.
+A lightweight Windows 11 Spotify taskbar widget / plugin-style mini player written in Python + Win32/GDI.
 
-> Naming note: this is an **overlay**, not a native Windows DeskBand/taskbar plugin. It does not patch or replace the Windows taskbar. The repository URL may still use `spotify-taskbar-plugin` for compatibility, but the accurate product name is **Spotify Taskbar Overlay**.
+If you searched for a **Spotify taskbar plugin**, **Spotify taskbar widget**, **Spotify mini player for Windows 11**, or **Spotify overlay with liked songs**, this is the kind of app you're looking for.
+
+> Naming note: technically this is an **overlay**, not a native Windows DeskBand/taskbar plugin. It does not patch or replace the Windows taskbar. The repo keeps `spotify-taskbar-plugin` in the URL because that is what many people search for, but the accurate product name is **Spotify Taskbar Overlay**.
 
 It keeps the native Windows taskbar intact — no ExplorerPatcher, StartAllBack, DeskBand registration, or taskbar replacement. The app runs as a topmost no-activate overlay snapped to taskbar height, with a tray controller and a small settings window.
+
+**Search keywords:** Spotify taskbar plugin, Spotify taskbar widget, Spotify Windows 11 mini player, Spotify taskbar overlay, Spotify liked songs widget, Windows media controls overlay.
 
 ![icon preview](spotify_taskbar_icon_preview.png)
 
