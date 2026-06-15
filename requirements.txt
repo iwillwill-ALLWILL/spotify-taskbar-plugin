@@ -1,0 +1,6 @@
+pywin32>=306
+Pillow>=10.0
+winrt-Windows.Media.Control
+winrt-Windows.Foundation
+winrt-Windows.Foundation.Collections
+winrt-Windows.Storage.Streams
