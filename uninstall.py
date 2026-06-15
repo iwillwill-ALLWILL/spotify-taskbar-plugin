@@ -16,7 +16,7 @@ import win32process
 
 RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 AUTOSTART_NAME = "SpotifyTaskbarTrayApp"
-SHORTCUT_NAME = "Spotify 任务栏插件.lnk"
+SHORTCUT_NAMES = ["Spotify Taskbar Overlay.lnk", "Spotify 任务栏悬浮窗.lnk", "Spotify 任务栏插件.lnk"]
 TRAY_CLASS = "SpotifyTaskbarTrayWin32"
 TRAY_TITLE = "SpotifyTaskbarTrayApp"
 OVERLAY_CLASS = "SpotifyTaskbarOverlayWin32"
@@ -53,11 +53,14 @@ def remove_startup() -> bool:
 
 
 def remove_shortcut() -> bool:
-    lnk = Path.home() / "Desktop" / SHORTCUT_NAME
-    if lnk.exists():
-        lnk.unlink()
-        return True
-    return False
+    removed = False
+    desktop = Path.home() / "Desktop"
+    for name in SHORTCUT_NAMES:
+        lnk = desktop / name
+        if lnk.exists():
+            lnk.unlink()
+            removed = True
+    return removed
 
 
 def main() -> None:

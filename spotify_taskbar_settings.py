@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ctypes
 import json
+import locale
 import os
 import subprocess
 import sys
@@ -47,7 +48,103 @@ DEFAULT_CONFIG = {
     "show_widget_on_app_start": True,
     "auto_start": False,
     "avoid_taskbar_overlap": True,
+    "language": "auto",  # auto | zh | en
 }
+
+STRINGS = {
+    "zh": {
+        "app_name": "Spotify 任务栏悬浮窗",
+        "settings_title": "Spotify 悬浮窗设置",
+        "language": "语言",
+        "language_auto": "自动",
+        "language_zh": "中文",
+        "language_en": "English",
+        "auto_start": "开机自启动托盘",
+        "snap_taskbar": "拖进任务栏时自动同高",
+        "hide_fullscreen": "全屏应用时隐藏",
+        "hide_no_media": "没有媒体时隐藏",
+        "save": "保存",
+        "reset": "重置位置",
+        "open": "打开悬浮窗",
+        "close": "关闭悬浮窗",
+        "saved": "已保存",
+        "opened": "已打开",
+        "closed": "已关闭",
+        "reset_done": "已重置位置",
+        "running": "运行中",
+        "not_running": "悬浮窗未运行",
+        "shown": "已显示",
+        "hidden": "已隐藏",
+        "reset_cli": "已重置",
+        "refresh_like": "刷新喜欢状态",
+        "exit_overlay": "退出悬浮窗",
+        "media": "媒体",
+    },
+    "en": {
+        "app_name": "Spotify Taskbar Overlay",
+        "settings_title": "Spotify Overlay Settings",
+        "language": "Language",
+        "language_auto": "Auto",
+        "language_zh": "中文",
+        "language_en": "English",
+        "auto_start": "Start tray app on login",
+        "snap_taskbar": "Snap to taskbar height when dragged into taskbar",
+        "hide_fullscreen": "Hide when fullscreen app is active",
+        "hide_no_media": "Hide when no media is playing",
+        "save": "Save",
+        "reset": "Reset position",
+        "open": "Show overlay",
+        "close": "Hide overlay",
+        "saved": "Saved",
+        "opened": "Shown",
+        "closed": "Hidden",
+        "reset_done": "Position reset",
+        "running": "Running",
+        "not_running": "Overlay not running",
+        "shown": "shown",
+        "hidden": "hidden",
+        "reset_cli": "reset",
+        "refresh_like": "Refresh liked state",
+        "exit_overlay": "Exit overlay",
+        "media": "Media",
+    },
+}
+
+LANGUAGE_OPTIONS = [("auto", "language_auto"), ("zh", "language_zh"), ("en", "language_en")]
+
+
+def system_language() -> str:
+    try:
+        lang = (locale.getlocale()[0] or locale.getdefaultlocale()[0] or "").lower()
+    except Exception:
+        lang = ""
+    return "zh" if lang.startswith("zh") else "en"
+
+
+def active_language(cfg: dict | None = None) -> str:
+    lang = (cfg or load_config()).get("language", "auto")
+    if lang == "zh":
+        return "zh"
+    if lang == "en":
+        return "en"
+    return system_language()
+
+
+def tr(key: str, cfg: dict | None = None) -> str:
+    lang = active_language(cfg)
+    return STRINGS.get(lang, STRINGS["en"]).get(key, STRINGS["en"].get(key, key))
+
+
+def language_display(value: str, cfg: dict | None = None) -> str:
+    lookup = {code: tr(label_key, cfg) for code, label_key in LANGUAGE_OPTIONS}
+    return lookup.get(value, lookup["auto"])
+
+
+def language_from_display(display: str, cfg: dict | None = None) -> str:
+    for code, label_key in LANGUAGE_OPTIONS:
+        if display == tr(label_key, cfg):
+            return code
+    return "auto"
 
 
 def pythonw() -> str:
@@ -165,10 +262,10 @@ def reset_auto_position(restart=True):
 
 class SettingsWindow:
     def __init__(self):
+        self.cfg = load_config()
         self.root = tk.Tk()
-        self.root.title("Spotify 插件设置")
-        self.root.geometry("420x370")
-        self.root.minsize(400, 350)
+        self.root.geometry("500x390")
+        self.root.minsize(480, 370)
         self.root.configure(bg="#111111")
         try:
             if ICON_PATH.exists():
@@ -176,12 +273,12 @@ class SettingsWindow:
         except Exception:
             pass
 
-        self.cfg = load_config()
         self.vars = {
             "avoid_taskbar_overlap": tk.BooleanVar(value=bool(self.cfg.get("avoid_taskbar_overlap", True))),
             "hide_fullscreen": tk.BooleanVar(value=bool(self.cfg.get("hide_fullscreen", True))),
             "hide_when_no_media": tk.BooleanVar(value=bool(self.cfg.get("hide_when_no_media", True))),
             "auto_start": tk.BooleanVar(value=is_auto_start_enabled()),
+            "language": tk.StringVar(value=language_display(str(self.cfg.get("language", "auto")), self.cfg)),
             "status": tk.StringVar(value=""),
         }
 
@@ -192,28 +289,73 @@ class SettingsWindow:
             style.configure("TLabel", background="#111111", foreground="#f3f3f3")
             style.configure("TCheckbutton", background="#111111", foreground="#f3f3f3")
             style.configure("TButton", padding=6)
+            style.configure("TCombobox", padding=4)
         except Exception:
             pass
 
-        frame = ttk.Frame(self.root, padding=14)
-        frame.pack(fill="both", expand=True)
-        frame.columnconfigure(0, weight=1)
-        frame.columnconfigure(1, weight=1)
+        self.frame = ttk.Frame(self.root, padding=14)
+        self.frame.pack(fill="both", expand=True)
+        self.frame.columnconfigure(0, weight=0)
+        self.frame.columnconfigure(1, weight=1)
+        self.frame.columnconfigure(2, weight=1)
 
-        ttk.Label(frame, text="Spotify 任务栏插件", font=("Microsoft YaHei UI", 13, "bold")).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 10))
-        ttk.Checkbutton(frame, text="开机自启动托盘", variable=self.vars["auto_start"]).grid(row=1, column=0, columnspan=2, sticky="w", pady=4)
-        ttk.Checkbutton(frame, text="拖进任务栏时自动同高", variable=self.vars["avoid_taskbar_overlap"]).grid(row=2, column=0, columnspan=2, sticky="w", pady=4)
-        ttk.Checkbutton(frame, text="全屏应用时隐藏", variable=self.vars["hide_fullscreen"]).grid(row=3, column=0, columnspan=2, sticky="w", pady=4)
-        ttk.Checkbutton(frame, text="没有媒体时隐藏", variable=self.vars["hide_when_no_media"]).grid(row=4, column=0, columnspan=2, sticky="w", pady=4)
+        self.title_label = ttk.Label(self.frame, font=("Microsoft YaHei UI", 13, "bold"))
+        self.title_label.grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 10))
 
-        ttk.Label(frame, textvariable=self.vars["status"], wraplength=370).grid(row=5, column=0, columnspan=2, sticky="w", pady=(10, 8))
+        self.language_label = ttk.Label(self.frame)
+        self.language_label.grid(row=1, column=0, sticky="w", pady=4, padx=(0, 10))
+        self.language_combo = ttk.Combobox(self.frame, textvariable=self.vars["language"], state="readonly", width=18)
+        self.language_combo.grid(row=1, column=1, columnspan=2, sticky="ew", pady=4)
+        self.language_combo.bind("<<ComboboxSelected>>", self.on_language_selected)
 
-        ttk.Button(frame, text="保存", command=self.save_and_restart).grid(row=6, column=0, sticky="ew", padx=(0, 5), pady=3)
-        ttk.Button(frame, text="重置位置", command=self.reset_position).grid(row=6, column=1, sticky="ew", padx=(5, 0), pady=3)
-        ttk.Button(frame, text="打开插件", command=self.show_overlay).grid(row=7, column=0, sticky="ew", padx=(0, 5), pady=3)
-        ttk.Button(frame, text="关闭插件", command=self.hide_overlay).grid(row=7, column=1, sticky="ew", padx=(5, 0), pady=3)
+        self.auto_start_check = ttk.Checkbutton(self.frame, variable=self.vars["auto_start"])
+        self.auto_start_check.grid(row=2, column=0, columnspan=3, sticky="w", pady=4)
+        self.snap_check = ttk.Checkbutton(self.frame, variable=self.vars["avoid_taskbar_overlap"])
+        self.snap_check.grid(row=3, column=0, columnspan=3, sticky="w", pady=4)
+        self.fullscreen_check = ttk.Checkbutton(self.frame, variable=self.vars["hide_fullscreen"])
+        self.fullscreen_check.grid(row=4, column=0, columnspan=3, sticky="w", pady=4)
+        self.no_media_check = ttk.Checkbutton(self.frame, variable=self.vars["hide_when_no_media"])
+        self.no_media_check.grid(row=5, column=0, columnspan=3, sticky="w", pady=4)
 
+        self.status_label = ttk.Label(self.frame, textvariable=self.vars["status"], wraplength=450)
+        self.status_label.grid(row=6, column=0, columnspan=3, sticky="w", pady=(10, 8))
+
+        self.save_button = ttk.Button(self.frame, command=self.save_and_restart)
+        self.save_button.grid(row=7, column=0, sticky="ew", padx=(0, 5), pady=3)
+        self.reset_button = ttk.Button(self.frame, command=self.reset_position)
+        self.reset_button.grid(row=7, column=1, sticky="ew", padx=5, pady=3)
+        self.open_button = ttk.Button(self.frame, command=self.show_overlay)
+        self.open_button.grid(row=8, column=0, sticky="ew", padx=(0, 5), pady=3)
+        self.close_button = ttk.Button(self.frame, command=self.hide_overlay)
+        self.close_button.grid(row=8, column=1, sticky="ew", padx=5, pady=3)
+
+        self.apply_language()
         self.refresh_status()
+
+    def selected_language_code(self) -> str:
+        return language_from_display(self.vars["language"].get(), self.cfg)
+
+    def on_language_selected(self, _event=None):
+        self.cfg["language"] = self.selected_language_code()
+        self.apply_language()
+        self.refresh_status()
+
+    def apply_language(self):
+        lang_value = str(self.cfg.get("language", "auto"))
+        self.root.title(tr("settings_title", self.cfg))
+        self.title_label.configure(text=tr("app_name", self.cfg))
+        self.language_label.configure(text=tr("language", self.cfg))
+        values = [tr(label_key, self.cfg) for _code, label_key in LANGUAGE_OPTIONS]
+        self.language_combo.configure(values=values)
+        self.vars["language"].set(language_display(lang_value, self.cfg))
+        self.auto_start_check.configure(text=tr("auto_start", self.cfg))
+        self.snap_check.configure(text=tr("snap_taskbar", self.cfg))
+        self.fullscreen_check.configure(text=tr("hide_fullscreen", self.cfg))
+        self.no_media_check.configure(text=tr("hide_no_media", self.cfg))
+        self.save_button.configure(text=tr("save", self.cfg))
+        self.reset_button.configure(text=tr("reset", self.cfg))
+        self.open_button.configure(text=tr("open", self.cfg))
+        self.close_button.configure(text=tr("close", self.cfg))
 
     def collect(self):
         cfg = load_config()
@@ -223,6 +365,7 @@ class SettingsWindow:
             "hide_fullscreen": bool(self.vars["hide_fullscreen"].get()),
             "hide_when_no_media": bool(self.vars["hide_when_no_media"].get()),
             "auto_start": bool(self.vars["auto_start"].get()),
+            "language": self.selected_language_code(),
         })
         return cfg
 
@@ -233,28 +376,30 @@ class SettingsWindow:
         restart_overlay()
         self.cfg = cfg
         self.vars["auto_start"].set(is_auto_start_enabled())
-        self.refresh_status("已保存")
+        self.apply_language()
+        self.refresh_status(tr("saved", self.cfg))
 
     def show_overlay(self):
         start_overlay()
-        self.refresh_status("已打开")
+        self.refresh_status(tr("opened", self.cfg))
 
     def hide_overlay(self):
         stop_overlay()
-        self.refresh_status("已关闭")
+        self.refresh_status(tr("closed", self.cfg))
 
     def reset_position(self):
         reset_auto_position(restart=True)
         self.cfg = load_config()
-        self.refresh_status("已重置位置")
+        self.apply_language()
+        self.refresh_status(tr("reset_done", self.cfg))
 
     def refresh_status(self, prefix=""):
         hits = enum_overlay_windows()
         if hits:
             _hwnd, pid, rect, _visible = hits[0]
-            text = f"运行中 · PID {pid} · {rect}"
+            text = f"{tr('running', self.cfg)} · PID {pid} · {rect}"
         else:
-            text = "插件未运行"
+            text = tr("not_running", self.cfg)
         if prefix:
             text = f"{prefix} · {text}"
         self.vars["status"].set(text)
@@ -264,17 +409,18 @@ class SettingsWindow:
 
 
 def cli():
+    cfg = load_config()
     if "--status" in sys.argv:
-        print(json.dumps({"running": is_overlay_running(), "windows": enum_overlay_windows(), "config": load_config()}, ensure_ascii=False, default=str))
+        print(json.dumps({"running": is_overlay_running(), "windows": enum_overlay_windows(), "config": cfg}, ensure_ascii=False, default=str))
         return True
     if "--show" in sys.argv:
-        start_overlay(); print("shown"); return True
+        start_overlay(); print(tr("shown", cfg)); return True
     if "--hide" in sys.argv:
-        stop_overlay(); print("hidden"); return True
+        stop_overlay(); print(tr("hidden", cfg)); return True
     if "--restart" in sys.argv:
         restart_overlay(); print("restarted"); return True
     if "--reset-auto" in sys.argv:
-        reset_auto_position(restart=True); print("reset"); return True
+        reset_auto_position(restart=True); print(tr("reset_cli", cfg)); return True
     return False
 
 

@@ -39,6 +39,11 @@ from winrt.windows.media.control import (
 )
 
 try:
+    import spotify_taskbar_settings as ctl
+except Exception:
+    ctl = None
+
+try:
     ctypes.windll.shcore.SetProcessDpiAwareness(2)  # per-monitor DPI aware
 except Exception:
     try:
@@ -70,6 +75,15 @@ LOG_MAX_BYTES = 512 * 1024
 
 WM_APP_REFRESH = win32con.WM_APP + 10
 WM_APP_REPOSITION = win32con.WM_APP + 11
+
+
+def ui_text(key: str, fallback: str) -> str:
+    try:
+        if ctl:
+            return ctl.tr(key)
+    except Exception:
+        pass
+    return fallback
 
 
 def rgb(hex_color: str) -> int:
@@ -341,7 +355,7 @@ async def choose_media_session():
 async def read_media_state() -> MediaState:
     session = await choose_media_session()
     if not session:
-        return MediaState(title="无媒体", dur=1.0, has_media=False)
+        return MediaState(title=ui_text("not_running", "No media"), dur=1.0, has_media=False)
     props = await session.try_get_media_properties_async()
     timeline = session.get_timeline_properties()
     playback = session.get_playback_info()
@@ -893,7 +907,7 @@ class OverlayApp:
             line = title if not artist else f"{title} — {artist}"
             self.text(hdc, line, (text_x, 3, max(text_x + 40, text_right), h // 2 + 4), C_FG, self.font_main)
 
-            app_hint = "Spotify" if ("spotify" in media.appid.lower() or spotify.uri) else "媒体"
+            app_hint = "Spotify" if ("spotify" in media.appid.lower() or spotify.uri) else ui_text("media", "Media")
             self.text(hdc, app_hint, (text_x, h // 2 + 4, text_x + 44, h - 2), C_MUTED, self.font_small)
 
             prog_x1 = text_x + 48
@@ -1109,11 +1123,11 @@ class OverlayApp:
 
     def show_context_menu(self):
         menu = win32gui.CreatePopupMenu()
-        win32gui.AppendMenu(menu, win32con.MF_STRING, 1, "重置自动定位")
-        win32gui.AppendMenu(menu, win32con.MF_STRING, 2, "刷新喜欢状态")
-        win32gui.AppendMenu(menu, win32con.MF_STRING, 4, "打开设置")
+        win32gui.AppendMenu(menu, win32con.MF_STRING, 1, ui_text("reset", "Reset position"))
+        win32gui.AppendMenu(menu, win32con.MF_STRING, 2, ui_text("refresh_like", "Refresh liked state"))
+        win32gui.AppendMenu(menu, win32con.MF_STRING, 4, ui_text("settings_title", "Settings"))
         win32gui.AppendMenu(menu, win32con.MF_SEPARATOR, 0, None)
-        win32gui.AppendMenu(menu, win32con.MF_STRING, 3, "退出插件")
+        win32gui.AppendMenu(menu, win32con.MF_STRING, 3, ui_text("exit_overlay", "Exit overlay"))
         x, y = win32gui.GetCursorPos()
         cmd = win32gui.TrackPopupMenu(menu, win32con.TPM_RETURNCMD | win32con.TPM_RIGHTBUTTON, x, y, 0, self.hwnd, None)
         if cmd == 1:

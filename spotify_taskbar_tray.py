@@ -89,7 +89,8 @@ class TrayApp:
     def add_icon(self):
         self.hicon = self.load_icon()
         flags = win32gui.NIF_ICON | win32gui.NIF_MESSAGE | win32gui.NIF_TIP
-        nid = (self.hwnd, 0, flags, WM_TRAYICON, self.hicon, "Spotify 任务栏插件")
+        cfg = ctl.load_config()
+        nid = (self.hwnd, 0, flags, WM_TRAYICON, self.hicon, ctl.tr("app_name", cfg))
         try:
             win32gui.Shell_NotifyIcon(win32gui.NIM_ADD, nid)
         except win32gui.error:
@@ -123,13 +124,14 @@ class TrayApp:
     def show_menu(self):
         running = ctl.is_overlay_running()
         menu = win32gui.CreatePopupMenu()
-        win32gui.AppendMenu(menu, win32con.MF_STRING, ID_SHOW_HIDE, "关闭" if running else "打开")
-        win32gui.AppendMenu(menu, win32con.MF_STRING, ID_SETTINGS, "设置")
-        win32gui.AppendMenu(menu, win32con.MF_STRING, ID_RESET, "重置位置")
-        win32gui.AppendMenu(menu, win32con.MF_STRING, ID_RESTART, "重启")
+        cfg = ctl.load_config()
+        win32gui.AppendMenu(menu, win32con.MF_STRING, ID_SHOW_HIDE, ctl.tr("close", cfg) if running else ctl.tr("open", cfg))
+        win32gui.AppendMenu(menu, win32con.MF_STRING, ID_SETTINGS, ctl.tr("settings_title", cfg))
+        win32gui.AppendMenu(menu, win32con.MF_STRING, ID_RESET, ctl.tr("reset", cfg))
+        win32gui.AppendMenu(menu, win32con.MF_STRING, ID_RESTART, "Restart" if ctl.active_language(cfg) == "en" else "重启")
         win32gui.AppendMenu(menu, win32con.MF_SEPARATOR, 0, None)
-        win32gui.AppendMenu(menu, win32con.MF_STRING, ID_EXIT, "退出托盘")
-        win32gui.AppendMenu(menu, win32con.MF_STRING, ID_EXIT_ALL, "关闭并退出")
+        win32gui.AppendMenu(menu, win32con.MF_STRING, ID_EXIT, "Exit tray" if ctl.active_language(cfg) == "en" else "退出托盘")
+        win32gui.AppendMenu(menu, win32con.MF_STRING, ID_EXIT_ALL, "Close and exit" if ctl.active_language(cfg) == "en" else "关闭并退出")
         x, y = win32gui.GetCursorPos()
         try:
             win32gui.SetForegroundWindow(self.hwnd)

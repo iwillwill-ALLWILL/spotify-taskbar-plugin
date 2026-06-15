@@ -1,8 +1,10 @@
-# Spotify Taskbar Plugin
+# Spotify Taskbar Overlay
 
 A lightweight Windows 11 Spotify taskbar-height mini-player written in Python + Win32/GDI.
 
-It keeps the native Windows taskbar intact — no ExplorerPatcher, StartAllBack, DeskBand registration, or taskbar replacement. The plugin runs as a topmost no-activate overlay snapped to taskbar height, with a tray controller and a small settings window.
+> Naming note: this is an **overlay**, not a native Windows DeskBand/taskbar plugin. It does not patch or replace the Windows taskbar. The repository URL may still use `spotify-taskbar-plugin` for compatibility, but the accurate product name is **Spotify Taskbar Overlay**.
+
+It keeps the native Windows taskbar intact — no ExplorerPatcher, StartAllBack, DeskBand registration, or taskbar replacement. The app runs as a topmost no-activate overlay snapped to taskbar height, with a tray controller and a small settings window.
 
 ![icon preview](spotify_taskbar_icon_preview.png)
 
@@ -18,14 +20,27 @@ It keeps the native Windows taskbar intact — no ExplorerPatcher, StartAllBack,
   - Left-click tray icon: show/hide overlay
   - Right-click tray icon: open settings
 - Settings window with startup toggle
+- Language: Auto / 中文 / English
 - Custom tray/settings icon
+
+## Language / 语言
+
+The UI supports Chinese and English.
+
+- Default: **Auto** — follows your Windows UI language
+- Manual switch: open Settings → Language → choose `中文` or `English` → Save
+
+界面支持中文和英文。
+
+- 默认：**自动** — 跟随 Windows 系统语言
+- 手动切换：右键托盘图标打开设置 → 语言 → 选择 `中文` 或 `English` → 保存
 
 ## Quick install
 
 ### Option A — Download ZIP
 
 1. Open the GitHub repo page.
-2. Click **Code → Download ZIP**.
+2. Click **Code → Download ZIP**, or download the release ZIP.
 3. Extract the ZIP anywhere you like.
 4. Double-click:
 
@@ -66,17 +81,29 @@ Make sure **Add python.exe to PATH** is enabled during Python installation.
 
 After installing:
 
-- Use the **desktop shortcut** to start the plugin
+- Use the **desktop shortcut** to start the overlay
 - **Left-click** the tray icon to show/hide the overlay
 - **Right-click** the tray icon to open settings
 
 Settings:
 
+English:
+
+- Language
+- Start tray app on login
+- Snap to taskbar height when dragged into taskbar
+- Hide when fullscreen app is active
+- Hide when no media is playing
+- Save / Reset position / Show overlay / Hide overlay
+
+中文：
+
+- 语言
 - 开机自启动托盘
 - 拖进任务栏时自动同高
 - 全屏应用时隐藏
 - 没有媒体时隐藏
-- 保存 / 重置位置 / 打开插件 / 关闭插件
+- 保存 / 重置位置 / 打开悬浮窗 / 关闭悬浮窗
 
 ## Uninstall
 
