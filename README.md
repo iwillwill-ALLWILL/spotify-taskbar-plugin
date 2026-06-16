@@ -98,7 +98,7 @@ English:
 - Snap to taskbar height when dragged into taskbar
 - Hide when fullscreen app is active
 - Hide when no media is playing
-- Save / Reset position / Show overlay / Hide overlay
+- Save / Reset position / Show overlay / Hide overlay / Exit app
 
 中文：
 
@@ -107,7 +107,7 @@ English:
 - 拖进任务栏时自动同高
 - 全屏应用时隐藏
 - 没有媒体时隐藏
-- 保存 / 重置位置 / 打开悬浮窗 / 关闭悬浮窗
+- 保存 / 重置位置 / 打开悬浮窗 / 关闭悬浮窗 / 退出插件
 
 ## Uninstall
 

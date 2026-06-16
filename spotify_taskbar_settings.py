@@ -32,6 +32,8 @@ OVERLAY_SCRIPT = Path(__file__).with_name("spotify_taskbar_overlay.py")
 TRAY_SCRIPT = Path(__file__).with_name("spotify_taskbar_tray.py")
 APP_TITLE = "SpotifyTaskbarOverlay"
 CLASS_NAME = "SpotifyTaskbarOverlayWin32"
+TRAY_APP_TITLE = "SpotifyTaskbarTrayApp"
+TRAY_CLASS_NAME = "SpotifyTaskbarTrayWin32"
 ICON_PATH = Path(__file__).with_name("spotify_taskbar_icon.ico")
 AUTOSTART_NAME = "SpotifyTaskbarTrayApp"
 RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
@@ -78,6 +80,9 @@ STRINGS = {
         "reset_cli": "已重置",
         "refresh_like": "刷新喜欢状态",
         "exit_overlay": "退出悬浮窗",
+        "quit_app": "退出插件",
+        "quitting": "正在退出插件",
+        "quit_done": "插件已退出",
         "media": "媒体",
     },
     "en": {
@@ -106,6 +111,9 @@ STRINGS = {
         "reset_cli": "reset",
         "refresh_like": "Refresh liked state",
         "exit_overlay": "Exit overlay",
+        "quit_app": "Exit app",
+        "quitting": "Exiting app",
+        "quit_done": "App exited",
         "media": "Media",
     },
 }
@@ -217,6 +225,47 @@ def is_overlay_running() -> bool:
     return bool(enum_overlay_windows())
 
 
+def enum_tray_windows():
+    hits = []
+
+    def cb(hwnd, _):
+        try:
+            if win32gui.GetWindowText(hwnd) == TRAY_APP_TITLE or win32gui.GetClassName(hwnd) == TRAY_CLASS_NAME:
+                _tid, pid = win32process.GetWindowThreadProcessId(hwnd)
+                hits.append((hwnd, pid, win32gui.GetWindowRect(hwnd), bool(win32gui.IsWindowVisible(hwnd))))
+        except Exception:
+            pass
+        return True
+
+    win32gui.EnumWindows(cb, None)
+    return hits
+
+
+def is_tray_running() -> bool:
+    return bool(enum_tray_windows())
+
+
+def stop_tray():
+    hits = enum_tray_windows()
+    pids = set()
+    for hwnd, pid, _rect, _visible in hits:
+        pids.add(pid)
+        try:
+            win32gui.PostMessage(hwnd, win32con.WM_CLOSE, 0, 0)
+        except Exception:
+            pass
+    deadline = time.time() + 2.0
+    while time.time() < deadline:
+        if not enum_tray_windows():
+            return
+        time.sleep(0.1)
+    for pid in pids:
+        try:
+            subprocess.run(["taskkill", "/F", "/PID", str(pid)], capture_output=True, text=True, encoding="gbk", errors="replace", timeout=3, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        except Exception:
+            pass
+
+
 def start_overlay():
     if is_overlay_running():
         return
@@ -264,8 +313,8 @@ class SettingsWindow:
     def __init__(self):
         self.cfg = load_config()
         self.root = tk.Tk()
-        self.root.geometry("500x390")
-        self.root.minsize(480, 370)
+        self.root.geometry("500x430")
+        self.root.minsize(480, 410)
         self.root.configure(bg="#111111")
         try:
             if ICON_PATH.exists():
@@ -328,6 +377,8 @@ class SettingsWindow:
         self.open_button.grid(row=8, column=0, sticky="ew", padx=(0, 5), pady=3)
         self.close_button = ttk.Button(self.frame, command=self.hide_overlay)
         self.close_button.grid(row=8, column=1, sticky="ew", padx=5, pady=3)
+        self.quit_button = ttk.Button(self.frame, command=self.quit_app)
+        self.quit_button.grid(row=9, column=0, columnspan=3, sticky="ew", padx=(0, 5), pady=(8, 3))
 
         self.apply_language()
         self.refresh_status()
@@ -356,6 +407,7 @@ class SettingsWindow:
         self.reset_button.configure(text=tr("reset", self.cfg))
         self.open_button.configure(text=tr("open", self.cfg))
         self.close_button.configure(text=tr("close", self.cfg))
+        self.quit_button.configure(text=tr("quit_app", self.cfg))
 
     def collect(self):
         cfg = load_config()
@@ -387,6 +439,14 @@ class SettingsWindow:
         stop_overlay()
         self.refresh_status(tr("closed", self.cfg))
 
+    def quit_app(self):
+        self.refresh_status(tr("quitting", self.cfg))
+        self.root.update_idletasks()
+        stop_overlay()
+        stop_tray()
+        self.vars["status"].set(tr("quit_done", self.cfg))
+        self.root.after(250, self.root.destroy)
+
     def reset_position(self):
         reset_auto_position(restart=True)
         self.cfg = load_config()
@@ -411,7 +471,13 @@ class SettingsWindow:
 def cli():
     cfg = load_config()
     if "--status" in sys.argv:
-        print(json.dumps({"running": is_overlay_running(), "windows": enum_overlay_windows(), "config": cfg}, ensure_ascii=False, default=str))
+        print(json.dumps({
+            "running": is_overlay_running(),
+            "tray_running": is_tray_running(),
+            "windows": enum_overlay_windows(),
+            "tray_windows": enum_tray_windows(),
+            "config": cfg,
+        }, ensure_ascii=False, default=str))
         return True
     if "--show" in sys.argv:
         start_overlay(); print(tr("shown", cfg)); return True
@@ -421,6 +487,8 @@ def cli():
         restart_overlay(); print("restarted"); return True
     if "--reset-auto" in sys.argv:
         reset_auto_position(restart=True); print(tr("reset_cli", cfg)); return True
+    if "--quit" in sys.argv:
+        stop_overlay(); stop_tray(); print(tr("quit_done", cfg)); return True
     return False
 
 
