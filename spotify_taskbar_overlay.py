@@ -72,6 +72,10 @@ UI_TIMER_MS = 250
 TOPMOST_ASSERT_SEC = 1.0
 PAUSED_REPAINT_SEC = 1.5
 LOG_MAX_BYTES = 512 * 1024
+OWNER_PID_ENV = "SPOTIFY_TASKBAR_OWNER_PID"
+NO_REEXEC_ENV = "SPOTIFY_TASKBAR_NO_REEXEC"
+CREATE_FLAGS_DETACHED = getattr(subprocess, "CREATE_NO_WINDOW", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) | 0x00000008  # DETACHED_PROCESS
+OWNER_CHECK_SEC = 1.0
 
 WM_APP_REFRESH = win32con.WM_APP + 10
 WM_APP_REPOSITION = win32con.WM_APP + 11
@@ -84,6 +88,30 @@ def ui_text(key: str, fallback: str) -> str:
     except Exception:
         pass
     return fallback
+
+
+def process_is_alive(pid: int) -> bool:
+    if pid <= 0 or pid == os.getpid():
+        return True
+    try:
+        kernel32 = ctypes.windll.kernel32
+        # PROCESS_QUERY_LIMITED_INFORMATION
+        handle = kernel32.OpenProcess(0x1000, False, int(pid))
+        if not handle:
+            return False
+        try:
+            code = ctypes.c_ulong()
+            if not kernel32.GetExitCodeProcess(handle, ctypes.byref(code)):
+                return False
+            return code.value == 259  # STILL_ACTIVE
+        finally:
+            kernel32.CloseHandle(handle)
+    except Exception:
+        return False
+
+
+def relaunch_with_pythonw_if_needed() -> bool:
+    return False
 
 
 def rgb(hex_color: str) -> int:
@@ -552,6 +580,11 @@ class OverlayApp:
         self.force_spotify_poll = True
         self.last_timer_repaint = 0.0
         self.last_topmost_assert = 0.0
+        try:
+            self.owner_pid = int(os.environ.get(OWNER_PID_ENV, "0") or 0)
+        except Exception:
+            self.owner_pid = 0
+        self.last_owner_check = 0.0
 
     def make_font(self, height: int, face: str, weight=win32con.FW_NORMAL):
         lf = win32gui.LOGFONT()
@@ -665,6 +698,29 @@ class OverlayApp:
         win32gui.SetWindowPos(self.hwnd, z, x, y, w, h, win32con.SWP_SHOWWINDOW | win32con.SWP_NOACTIVATE)
         win32gui.InvalidateRect(self.hwnd, None, True)
         win32gui.UpdateWindow(self.hwnd)
+
+    def close_if_owner_gone(self) -> bool:
+        if not self.owner_pid:
+            return False
+        now = time.perf_counter()
+        if now - self.last_owner_check < OWNER_CHECK_SEC:
+            return False
+        self.last_owner_check = now
+        owner_alive = process_is_alive(self.owner_pid)
+        tray_window_alive = True
+        try:
+            if ctl and hasattr(ctl, "is_tray_running"):
+                tray_window_alive = bool(ctl.is_tray_running())
+        except Exception:
+            tray_window_alive = True
+        if owner_alive and tray_window_alive:
+            return False
+        log("owner/tray gone; closing overlay", "owner_pid", self.owner_pid, "owner_alive", owner_alive, "tray_window_alive", tray_window_alive)
+        try:
+            win32gui.PostMessage(self.hwnd, win32con.WM_CLOSE, 0, 0)
+        except Exception:
+            self.running = False
+        return True
 
     def persist_geometry(self):
         x, y, w, h = self.geometry
@@ -1189,6 +1245,8 @@ class OverlayApp:
             self.drag_mode = None
             return 0
         if msg == win32con.WM_TIMER:
+            if self.close_if_owner_gone():
+                return 0
             if self.visible:
                 now = time.perf_counter()
                 if now - self.last_topmost_assert >= TOPMOST_ASSERT_SEC:
@@ -1242,6 +1300,8 @@ class OverlayApp:
 
 
 if __name__ == "__main__":
+    if relaunch_with_pythonw_if_needed():
+        sys.exit(0)
     close_existing_instances()
     app = OverlayApp()
     app.run()

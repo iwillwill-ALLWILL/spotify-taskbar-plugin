@@ -33,12 +33,13 @@ echo [3/4] Creating desktop shortcut...
 if errorlevel 1 goto fail
 
 echo [4/4] Starting tray app...
-start "" "%VENV_PYW%" "%~dp0spotify_taskbar_tray.py"
+wscript.exe "%~dp0start-spotify-taskbar-overlay.vbs"
 
 echo.
 echo Done. Use the desktop shortcut or tray icon to manage the plugin.
 echo Right-click tray icon: settings. Left-click: show/hide overlay.
-pause
+echo This installer window will close automatically.
+timeout /t 2 /nobreak >nul
 exit /b 0
 
 :fail

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ctypes
+import os
 import subprocess
 import sys
 import time
@@ -34,6 +35,12 @@ ID_RESET = 1004
 ID_EXIT = 1005
 ID_EXIT_ALL = 1006
 ICON_PATH = Path(__file__).with_name("spotify_taskbar_icon.ico")
+CREATE_FLAGS_DETACHED = getattr(subprocess, "CREATE_NO_WINDOW", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) | 0x00000008  # DETACHED_PROCESS
+NO_REEXEC_ENV = "SPOTIFY_TASKBAR_NO_REEXEC"
+
+
+def relaunch_with_pythonw_if_needed() -> bool:
+    return False
 
 
 class TrayApp:
@@ -111,7 +118,7 @@ class TrayApp:
         try:
             if self.settings_proc and self.settings_proc.poll() is None:
                 return
-            self.settings_proc = subprocess.Popen([exe, str(script)], creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+            self.settings_proc = subprocess.Popen([exe, str(script)], creationflags=CREATE_FLAGS_DETACHED, close_fds=True)
         except Exception:
             self.settings_proc = None
 
@@ -119,7 +126,7 @@ class TrayApp:
         if ctl.is_overlay_running():
             ctl.stop_overlay()
         else:
-            ctl.start_overlay()
+            ctl.start_overlay(owner_pid=os.getpid())
 
     def show_menu(self):
         running = ctl.is_overlay_running()
@@ -142,7 +149,7 @@ class TrayApp:
             if running:
                 ctl.stop_overlay()
             else:
-                ctl.start_overlay()
+                ctl.start_overlay(owner_pid=os.getpid())
         elif cmd == ID_SETTINGS:
             self.open_settings()
         elif cmd == ID_RESTART:
@@ -183,10 +190,12 @@ class TrayApp:
         self.add_icon()
         cfg = ctl.load_config()
         if cfg.get("show_widget_on_app_start", True) and not ctl.is_overlay_running():
-            ctl.start_overlay()
+            ctl.start_overlay(owner_pid=os.getpid())
         win32gui.PumpMessages()
 
 
 if __name__ == "__main__":
+    if relaunch_with_pythonw_if_needed():
+        sys.exit(0)
     app = TrayApp()
     app.run()

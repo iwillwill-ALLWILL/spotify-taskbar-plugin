@@ -57,7 +57,7 @@ The installer will:
 - create a local `.venv`
 - install Python dependencies
 - create a desktop shortcut
-- start the tray app
+- start the tray app through a hidden launcher, so no terminal window stays on the taskbar
 
 ### Option B — Git clone
 
@@ -109,6 +109,11 @@ English:
 - 没有媒体时隐藏
 - 保存 / 重置位置 / 打开悬浮窗 / 关闭悬浮窗 / 退出插件
 
+Notes:
+
+- The desktop shortcut and `start-spotify-taskbar-plugin.cmd` use a hidden WScript launcher; they should not leave a console/terminal window on the taskbar.
+- If the tray app exits or is killed, the overlay detects that and exits too, so it should not remain as an orphan window.
+
 ## Uninstall
 
 Double-click:
@@ -156,6 +161,7 @@ If that file is missing, playback UI still works through Windows GSMTC, but like
 install.cmd                         One-click installer
 uninstall.cmd / uninstall.py         Stop/remove startup/shortcut
 start-spotify-taskbar-plugin.cmd     Start helper
+start-spotify-taskbar-overlay.vbs    Hidden no-console launcher used by shortcuts
 install_desktop_shortcut.py          Desktop shortcut creator
 spotify_taskbar_overlay.py           Main Win32/GDI overlay
 spotify_taskbar_tray.py              Tray app/controller

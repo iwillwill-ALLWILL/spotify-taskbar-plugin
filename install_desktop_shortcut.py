@@ -2,7 +2,7 @@
 """Create a desktop shortcut for the Spotify taskbar overlay."""
 from __future__ import annotations
 
-import sys
+import os
 from pathlib import Path
 
 import win32com.client
@@ -10,13 +10,14 @@ import win32com.client
 import spotify_taskbar_settings as ctl
 
 ROOT = Path(__file__).resolve().parent
-TRAY_SCRIPT = ROOT / "spotify_taskbar_tray.py"
+LAUNCHER_SCRIPT = ROOT / "start-spotify-taskbar-overlay.vbs"
 ICON_PATH = ROOT / "spotify_taskbar_icon.ico"
 
 
-def pythonw() -> Path:
-    p = Path(sys.executable).with_name("pythonw.exe")
-    return p if p.exists() else Path(sys.executable)
+def wscript() -> str:
+    windir = Path(os.environ.get("WINDIR", r"C:\Windows"))
+    exe = windir / "System32" / "wscript.exe"
+    return str(exe if exe.exists() else "wscript.exe")
 
 
 def shortcut_name() -> str:
@@ -31,8 +32,8 @@ def main() -> None:
 
     shell = win32com.client.Dispatch("WScript.Shell")
     shortcut = shell.CreateShortcut(str(lnk))
-    shortcut.TargetPath = str(pythonw())
-    shortcut.Arguments = f'"{TRAY_SCRIPT}"'
+    shortcut.TargetPath = wscript()
+    shortcut.Arguments = f'"{LAUNCHER_SCRIPT}"'
     shortcut.WorkingDirectory = str(ROOT)
     shortcut.WindowStyle = 7
     shortcut.Description = ctl.tr("app_name")

@@ -37,6 +37,10 @@ TRAY_CLASS_NAME = "SpotifyTaskbarTrayWin32"
 ICON_PATH = Path(__file__).with_name("spotify_taskbar_icon.ico")
 AUTOSTART_NAME = "SpotifyTaskbarTrayApp"
 RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
+CREATE_FLAGS_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+CREATE_FLAGS_DETACHED = CREATE_FLAGS_NO_WINDOW | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) | 0x00000008  # DETACHED_PROCESS
+OWNER_PID_ENV = "SPOTIFY_TASKBAR_OWNER_PID"
+NO_REEXEC_ENV = "SPOTIFY_TASKBAR_NO_REEXEC"
 
 DEFAULT_CONFIG = {
     "auto_position": True,
@@ -261,15 +265,22 @@ def stop_tray():
         time.sleep(0.1)
     for pid in pids:
         try:
-            subprocess.run(["taskkill", "/F", "/PID", str(pid)], capture_output=True, text=True, encoding="gbk", errors="replace", timeout=3, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+            subprocess.run(["taskkill", "/F", "/PID", str(pid)], capture_output=True, text=True, encoding="gbk", errors="replace", timeout=3, creationflags=CREATE_FLAGS_NO_WINDOW)
         except Exception:
             pass
 
 
-def start_overlay():
+def start_overlay(owner_pid: int | None = None):
     if is_overlay_running():
         return
-    subprocess.Popen([pythonw(), str(OVERLAY_SCRIPT)], creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    env = os.environ.copy()
+    if owner_pid is None:
+        tray_hits = enum_tray_windows()
+        if tray_hits:
+            owner_pid = int(tray_hits[0][1])
+    if owner_pid:
+        env[OWNER_PID_ENV] = str(int(owner_pid))
+    subprocess.Popen([pythonw(), str(OVERLAY_SCRIPT)], creationflags=CREATE_FLAGS_DETACHED, env=env, close_fds=True)
     time.sleep(0.35)
 
 
@@ -289,7 +300,7 @@ def stop_overlay():
         time.sleep(0.1)
     for pid in pids:
         try:
-            subprocess.run(["taskkill", "/F", "/PID", str(pid)], capture_output=True, text=True, encoding="gbk", errors="replace", timeout=3, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+            subprocess.run(["taskkill", "/F", "/PID", str(pid)], capture_output=True, text=True, encoding="gbk", errors="replace", timeout=3, creationflags=CREATE_FLAGS_NO_WINDOW)
         except Exception:
             pass
 
