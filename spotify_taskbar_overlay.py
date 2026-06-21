@@ -29,9 +29,10 @@ import win32gui
 import win32process
 
 try:
-    from PIL import Image, ImageWin
+    from PIL import Image, ImageFilter, ImageWin
 except Exception:
     Image = None
+    ImageFilter = None
     ImageWin = None
 
 from winrt.windows.media.control import (
@@ -576,6 +577,7 @@ class OverlayApp:
         self.drag_start_geometry = (0, 0, BASE_WIDTH, 44)
         self.last_cursor = None
         self.art_hash = ""
+        self.art_size = 0
         self.art_dib = None
         self.force_spotify_poll = True
         self.last_timer_repaint = 0.0
@@ -870,32 +872,46 @@ class OverlayApp:
     def add_region(self, name, rect):
         self.regions[name] = rect
 
-    def prepare_art(self, media: MediaState):
+    def prepare_art(self, media: MediaState, target_size: int):
         if not Image or not ImageWin or not media.art_bytes:
             if not media.art_bytes:
                 self.art_hash = ""
+                self.art_size = 0
                 self.art_dib = None
             return
-        if media.art_hash and media.art_hash == self.art_hash and self.art_dib is not None:
+        target_size = max(1, int(target_size or 1))
+        art_hash = media.art_hash or hashlib.sha1(media.art_bytes).hexdigest()[:16]
+        if art_hash == self.art_hash and target_size == self.art_size and self.art_dib is not None:
             return
         try:
             img = Image.open(io.BytesIO(media.art_bytes)).convert("RGB")
-            # Square crop center, then let GDI scale to the taskbar-height box.
+            # Square crop center, then downsample with Pillow's high-quality
+            # filter. Letting ImageWin/GDI shrink a 300px+ cover into a tiny
+            # taskbar-height square uses a poor stretch mode and turns detailed
+            # covers into noisy speckles.
             w, h = img.size
             side = min(w, h)
             if side > 0:
                 left = (w - side) // 2
                 top = (h - side) // 2
                 img = img.crop((left, top, left + side, top + side))
+            if img.size != (target_size, target_size):
+                if ImageFilter and target_size <= 72 and max(img.size) / max(target_size, 1) >= 3:
+                    img = img.filter(ImageFilter.GaussianBlur(0.55))
+                resample = getattr(getattr(Image, "Resampling", Image), "LANCZOS", getattr(Image, "LANCZOS", 1))
+                img = img.resize((target_size, target_size), resample)
             self.art_dib = ImageWin.Dib(img)
-            self.art_hash = media.art_hash or hashlib.sha1(media.art_bytes).hexdigest()[:16]
+            self.art_hash = art_hash
+            self.art_size = target_size
         except Exception as e:
             log("prepare art failed", repr(e))
             self.art_hash = ""
+            self.art_size = 0
             self.art_dib = None
 
     def draw_art(self, hdc, rect, media: MediaState):
-        self.prepare_art(media)
+        size = max(1, min(int(rect[2] - rect[0]), int(rect[3] - rect[1])))
+        self.prepare_art(media, size)
         if self.art_dib is not None:
             try:
                 self.art_dib.draw(hdc, rect)
